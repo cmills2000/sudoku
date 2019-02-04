@@ -8,7 +8,7 @@ Date: February 2019
 
 function SudokuView(grid, masked, difficulty, playerMoves, computerMoves, createdTime, solvedTime, computerSolutionTime)
 {
-    this.grid = grid;
+    this.board = grid;
     this.masked = masked;
     this.difficulty = difficulty;
     this.playerMoves = playerMoves;
@@ -26,7 +26,6 @@ class Sudoku {
             return new Sudoku(sudokuConfig);
         }
         
-        // private variables
         // n is the dimension size
         this.n = 9;
         this.divisor = this.n / 3;
@@ -36,10 +35,6 @@ class Sudoku {
         this.createdAtTime = Date.now();
         this.solvedAtTime = null;
         this.computerSolutionTime = null;
-        
-        // grid is the puzzle solution as an array of arrays
-        this.grid = null;
-        this.maskedGrid = null;
         
         // diffulty level (77 >= hints >= 17 when n=9)
         this.difficulty = 50;
@@ -70,8 +65,10 @@ class Sudoku {
             }
             return grid;
         };
-        this.grid = this.getEmptyGrid();
-        let thisGrid = this.grid;
+
+        // board is the puzzle solution as an array of arrays
+        this.sourceBoard = this.getEmptyGrid();
+        this.board = this.getEmptyGrid();
 
         // create array of specified length
         this.createArrayOfLength = function (length, func) {
@@ -98,7 +95,7 @@ class Sudoku {
             return boxIdx;
         };
         
-        // pick a valid value for the given cell
+        // check value for the given cell during computer solution
         this.isValidValue = function (row, col, val, tried) {
             // check that the number has not already been tried
             if (tried.hasOwnProperty(val)) {
@@ -119,6 +116,67 @@ class Sudoku {
             }
             return true;
         };
+
+        // check value for a given cell during human solution
+        this.checkValidValue = function (row, col, val) {
+            if (!val)
+            {
+                return false;
+            }
+
+
+            // check that the number is not selected in the row
+            for (var i = 0; i < this.n; i++) {
+                let x = this.board[row][i];
+                if (x === val) 
+                {
+                    return false;
+                }
+            }
+
+            // check that the number is not selected in the column
+            for (var i = 0; i < this.n; i++) {
+                let x = this.board[i][col];
+                if (x === val) 
+                {
+                    return false;
+                }
+            }
+
+            // check that the number is not selected in the box
+            let boxRowIdx = Math.floor(row / this.divisor) * this.divisor;
+            let boxColIdx = Math.floor(col / this.divisor) * this.divisor;
+            for (var y = boxRowIdx; y < boxRowIdx + this.divisor; y++)
+            {
+                for (var x = boxColIdx; x < boxColIdx + this.divisor; x++)
+                {
+                    let v = this.board[y][x];
+                    if (v === val)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+
+            return true;
+        };
+
+        this.check = function()
+        {
+            let valid = true;
+
+            for (let y = 0; y < this.n; y++) {
+                for (let x = 0; x < this.n; x++) {
+                    valid = this.checkValidValue(y, x, this.board[y][x]);
+                    if (!valid){
+                        break;
+                    }
+                }
+            }
+
+            return valid;
+        }
         
         // pick a valid value for the given cell
         this.pickValidValue = function (row, col, tried) {
@@ -145,8 +203,8 @@ class Sudoku {
         // get a value at the specified index
         this.getOrSelectValue = function (rowIdx, colIdx, random, tried) {
             let value = null;
-            if (this.maskedGrid) {
-                value = this.maskedGrid[rowIdx][colIdx];
+            if (this.board) {
+                value = this.board[rowIdx][colIdx];
             }
             if (!value) {
                 if (random) {
@@ -158,6 +216,17 @@ class Sudoku {
             }
             return value;
         };
+
+        this.setValue = function (rowIdx, colIdx, value)
+        {
+            value = parseInt(value);
+            console.log(`value:${value}`);
+            let valid = this.checkValidValue(rowIdx, colIdx, value);
+
+            this.board[rowIdx][colIdx] = value;
+
+            return valid;
+        }
         
         // solve the puzzle dynamically
         this.solveDynamic = function (rowIdx, colIdx) {
@@ -184,18 +253,22 @@ class Sudoku {
                     done = true;
                 }
                 // set the value for this cell
-                this.grid[rowIdx][colIdx] = value;
+                this.sourceBoard[rowIdx][colIdx] = value;
                 // if we have a valid value add entries to the lookups and continue
                 if (value) {
                     tried[value] = true;
                     this.columnLookup[colIdx][value] = true;
                     this.rowLookup[rowIdx][value] = true;
+                    let boxIdx = this.getBoxIdx(rowIdx, colIdx);
+                    this.boxLookup[boxIdx][value] = true;
+                    
                     // get the number for the next cell
                     if (!done) {
                         nextValue = this.solveDynamic(nextRowIdx, nextColIdx);
                         if (!nextValue) {
                             delete this.columnLookup[colIdx][value];
                             delete this.rowLookup[rowIdx][value];
+                            delete this.boxLookup[boxIdx][value];
                         }
                     }
                 }
@@ -214,7 +287,7 @@ class Sudoku {
             this.solveDynamic(0, 0);
             let endTime = Date.now();
             this.computerSolutionTime = endTime - startTime;
-            return this.grid;
+            return this.sourceBoard;
         };
         
         // get the number of hints based on the difficulty level
@@ -244,20 +317,22 @@ class Sudoku {
                     }
                 } while (used);
             }
-            this.maskedGrid = this.getEmptyGrid();
+
             for (var coord in taken) {
                 let x = taken[coord];
-                this.maskedGrid[x[1]][x[0]] = this.grid[x[1]][x[0]];
+                this.board[x[1]][x[0]] = this.sourceBoard[x[1]][x[0]];
             }
-            return this.maskedGrid;
+            return this.board;
         };
+        
+        
         if (this.hint) {
-            this.grid = this.solve();
-            this.maskedGrid = this.mask();
-            this.thisGrid = this.maskedGrid;
+            this.sourceBoard = this.solve();
+            this.board = this.mask();
+            this.thisGrid = this.board;
         }
-        let puzzleView = new SudokuView(this.thisGrid, this.hint, this.difficulty, this.playerMoves, this.computerMoves, this.createdAtTime, this.solvedAtTime, this.computerSolutionTime);
-        return puzzleView;
+        //let puzzleView = new SudokuView(this.thisGrid, this.hint, this.difficulty, this.playerMoves, this.computerMoves, this.createdAtTime, this.solvedAtTime, this.computerSolutionTime);
+        //return puzzleView;
     }
 }
 
@@ -294,8 +369,17 @@ exports.api = (function () {
 
             return puzzleView;
 
-        }
+        },
 
+        setValue: function(sudoku, row, column, value)
+        {
+            return sudoku.setValue(row, column, value);
+        },
+
+        check: function()
+        {
+            return sudoku.check();
+        }
 
     };
   }());

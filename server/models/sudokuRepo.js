@@ -10,7 +10,6 @@ var sudokuModule = require('./sudoku');
 
 exports.repo = (function () {
     // private variables
-
     let db = new Object();
     let counter = 0;
 
@@ -28,7 +27,7 @@ exports.repo = (function () {
 
             return {
                 id: id,
-                puzzle: puzzle
+                sudoku: puzzle
             };
         },
         
@@ -39,7 +38,8 @@ exports.repo = (function () {
 
         delete: function(id)
         {
-            return null;
+            return db[id] = null;
         },
+
     };
   }());
