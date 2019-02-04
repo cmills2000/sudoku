@@ -9,10 +9,12 @@ router.get('/', function(req, res, next) {
   res.json({ title: 'Sudoku' });
 });
 
+// POST: /api/sudoku/new
 router.post('/new', function(req, res, next) {
     res.json(repo.new());
 });
 
+// POST: /api/sudoku/get/:id
 router.post('/get/:id(\\d+)', function(req, res, next) {
     let id = req.params.id;
     let puzzle = repo.get(id);
